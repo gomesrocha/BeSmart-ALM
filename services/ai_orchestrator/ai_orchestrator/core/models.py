@@ -35,6 +35,7 @@ class Task:
     description: str
     priority: int
     complexity: TaskComplexity
+    task_type: str = "feature"
     status: TaskStatus = TaskStatus.PENDING
     assigned_agent: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.now)
@@ -57,6 +58,7 @@ class Task:
             'description': self.description,
             'priority': self.priority,
             'complexity': self.complexity.value,
+            'task_type': self.task_type,
             'status': self.status.value,
             'assigned_agent': self.assigned_agent,
             'created_at': self.created_at.isoformat(),
