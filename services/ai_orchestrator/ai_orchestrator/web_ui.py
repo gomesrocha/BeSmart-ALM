@@ -363,6 +363,7 @@ async def add_to_queue(request: WorkItemAction):
             description=wi["description"],
             priority=priority_map.get(wi["priority"], 3),
             complexity=complexity_map.get(wi["complexity"], TaskComplexity.MEDIUM),
+            task_type=request.task_type,
             acceptance_criteria=wi.get("acceptance_criteria", [])
         )
         
