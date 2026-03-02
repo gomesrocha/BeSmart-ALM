@@ -24,9 +24,18 @@
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
         .form-group input, .form-group select { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .work-item { border: 1px solid #e5e7eb; border-radius: 6px; padding: 15px; margin-bottom: 10px; }
+        .work-item { border: 1px solid #e5e7eb; border-radius: 6px; padding: 15px; margin-bottom: 10px; background: white; }
         .work-item.ready { border-left: 4px solid #10b981; }
         .work-item.backlog { border-left: 4px solid #6b7280; }
+        .work-item-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .work-item-header input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
+        .work-item-header h4 { flex: 1; margin: 0; font-size: 16px; }
+        .work-item-header .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+        .work-item-header .status.ready { background: #d1fae5; color: #065f46; }
+        .work-item-header .status.backlog { background: #f3f4f6; color: #374151; }
+        .work-item .description { color: #6b7280; font-size: 14px; margin-bottom: 10px; }
+        .work-item-meta { display: flex; gap: 15px; font-size: 12px; color: #6b7280; }
+        .work-item-meta span { display: inline-flex; align-items: center; gap: 5px; }
         .priority-critical { color: #ef4444; font-weight: bold; }
         .priority-high { color: #f59e0b; font-weight: bold; }
         .priority-medium { color: #3b82f6; }
@@ -188,6 +197,40 @@
             'refactoring': 'Improve code quality, structure, and maintainability',
             'bugfix': 'Fix bugs, issues, and defects in the codebase'
         };
+        
+        // Handle work item selection
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('work-item-checkbox')) {
+                console.log('📋 Checkbox changed:', e.target.dataset.id, 'checked:', e.target.checked);
+                updateSelectedCount();
+            }
+        });
+        
+        // Adicionar listener também no container específico
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('work-item-checkbox')) {
+                console.log('🖱️ Checkbox clicked:', e.target.dataset.id);
+                // Forçar o update após um pequeno delay para garantir que o estado mudou
+                setTimeout(updateSelectedCount, 10);
+            }
+        });
+        
+        function updateSelectedCount() {
+            const checkboxes = document.querySelectorAll('.work-item-checkbox:checked');
+            const count = checkboxes.length;
+            const button = document.getElementById('addToQueueBtn');
+            console.log('🔢 Selected count:', count, 'Button:', button);
+            if (count > 0) {
+                button.textContent = `Add Selected to Queue (${count})`;
+                button.disabled = false;
+                button.classList.remove('hidden');
+                console.log('✅ Button enabled');
+            } else {
+                button.textContent = 'Add Selected to Queue';
+                button.disabled = true;
+                console.log('❌ Button disabled');
+            }
+        }
         
         // Update task type description
         document.getElementById('taskTypeSelect').addEventListener('change', function() {
@@ -390,34 +433,51 @@
                 const container = document.getElementById('workItemsList');
                 container.innerHTML = '';
                 
+                console.log(`📦 Loading ${data.work_items.length} work items...`);
+                
                 data.work_items.forEach(wi => {
                     const div = document.createElement('div');
-                    div.className = `work-item ${wi.status}`;
+                    div.className = 'work-item';
+                    div.dataset.id = wi.id;
                     div.innerHTML = `
-                        <input type="checkbox" id="wi-${wi.id}" value="${wi.id}" ${wi.status === 'ready' ? '' : 'disabled'}>
-                        <label for="wi-${wi.id}">
-                            <strong>${wi.title}</strong>
-                            <span class="priority-${wi.priority}">[${wi.priority.toUpperCase()}]</span>
-                            <br>
-                            <small>${wi.description}</small>
-                            <br>
-                            <small>Status: ${wi.status} | Complexity: ${wi.complexity}</small>
-                        </label>
+                        <div class="work-item-header">
+                            <input type="checkbox" class="work-item-checkbox" data-id="${wi.id}" ${wi.status === 'ready' ? '' : 'disabled'}>
+                            <h4>${wi.title}</h4>
+                            <span class="status ${wi.status}">${wi.status}</span>
+                        </div>
+                        <p class="description">${wi.description || 'No description'}</p>
+                        <div class="work-item-meta">
+                            <span class="type">${wi.type || 'Task'}</span>
+                            <span class="priority priority-${wi.priority}">${wi.priority || 'Medium'}</span>
+                            <span class="complexity">Complexity: ${wi.complexity || 'N/A'}</span>
+                        </div>
                     `;
                     container.appendChild(div);
                 });
                 
+                // Verificar se os checkboxes foram criados
+                const checkboxes = document.querySelectorAll('.work-item-checkbox');
+                console.log(`✅ Created ${checkboxes.length} checkboxes`);
+                
                 document.getElementById('addToQueueBtn').classList.remove('hidden');
+                updateSelectedCount();
             } catch (error) {
                 alert('Failed to load work items: ' + error.message);
             }
         }
         
         async function addSelectedToQueue() {
-            const checkboxes = document.querySelectorAll('#workItemsList input[type="checkbox"]:checked');
-            const workItemIds = Array.from(checkboxes).map(cb => cb.value);
+            const checkboxes = document.querySelectorAll('.work-item-checkbox:checked');
+            const selectedItems = Array.from(checkboxes).map(cb => {
+                const workItem = cb.closest('.work-item');
+                return {
+                    id: cb.dataset.id,
+                    title: workItem.querySelector('h4').textContent,
+                    description: workItem.querySelector('.description').textContent
+                };
+            });
             
-            if (workItemIds.length === 0) {
+            if (selectedItems.length === 0) {
                 alert('Please select work items to add to queue');
                 return;
             }
@@ -428,18 +488,24 @@
             }
             
             try {
-                await fetch('/api/add-to-queue', {
+                const response = await fetch('/api/add-to-queue', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        work_item_ids: workItemIds,
+                        work_items: selectedItems,
                         task_type: selectedTaskType
                     })
                 });
                 
-                checkboxes.forEach(cb => cb.checked = false);
-                loadQueueStatus();
-                alert(`Added ${workItemIds.length} work item(s) to queue with task type: ${selectedTaskType}`);
+                if (response.ok) {
+                    checkboxes.forEach(cb => cb.checked = false);
+                    updateSelectedCount();
+                    loadQueueStatus();
+                    alert(`Added ${selectedItems.length} work item(s) to queue with task type: ${selectedTaskType}`);
+                } else {
+                    const error = await response.text();
+                    alert(`Failed to add items: ${error}`);
+                }
             } catch (error) {
                 alert('Failed to add to queue: ' + error.message);
             }

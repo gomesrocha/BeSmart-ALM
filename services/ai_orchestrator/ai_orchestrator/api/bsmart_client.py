@@ -62,7 +62,7 @@ class BsmartClient:
     async def _get_projects(self) -> List[Dict[str, Any]]:
         """Get all projects."""
         try:
-            url = f'{self.api_url}/api/v1/projects'
+            url = f'{self.api_url}/projects'
             logger.info(f"🔍 Fetching projects from: {url}")
             logger.info(f"🔑 Using token: {self.api_key[:20]}...")
             
@@ -101,23 +101,39 @@ class BsmartClient:
     ) -> List[Dict[str, Any]]:
         """Get work items for a project."""
         try:
-            url = f'{self.api_url}/projects/{project_id}/work-items'
-            params = {'status': status} if status else {}
+            # URL correta: /work-items com query param project_id
+            url = f'{self.api_url}/work-items'
+            params = {'project_id': project_id}
+            if status:
+                params['status'] = status
+            
+            logger.info(f"🔍 Fetching work items from: {url}")
+            logger.info(f"   Params: {params}")
+            logger.info(f"🔑 Using token: {self.api_key[:20]}...")
             
             response = await self.client.get(url, params=params)
+            logger.info(f"📡 Response status: {response.status_code}")
+            
             response.raise_for_status()
             data = response.json()
             
+            logger.info(f"📦 Response data type: {type(data)}")
+            logger.info(f"📦 Response data: {data}")
+            
             # API retorna lista diretamente
             if isinstance(data, list):
+                logger.info(f"✅ Got {len(data)} work items (list format)")
                 return data
             # Ou pode retornar objeto com 'data' ou 'work_items'
             elif isinstance(data, dict):
-                return data.get('data', data.get('work_items', []))
+                work_items = data.get('data', data.get('work_items', []))
+                logger.info(f"✅ Got {len(work_items)} work items (dict format)")
+                return work_items
             
+            logger.warning("⚠️ Unexpected data format, returning empty list")
             return []
         except Exception as e:
-            logger.error(f"Failed to get work items for project {project_id}: {e}")
+            logger.error(f"❌ Failed to get work items for project {project_id}: {type(e).__name__}: {e}")
             return []
     
     async def get_work_item_context(self, work_item_id: str) -> Dict[str, Any]:

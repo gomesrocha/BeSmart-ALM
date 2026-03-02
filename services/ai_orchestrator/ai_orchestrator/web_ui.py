@@ -75,12 +75,17 @@ async def login(request: LoginRequest):
         # Try to authenticate with real API
         async with httpx.AsyncClient() as client:
             try:
-                login_url = f"{request.api_url}/api/v1/auth/login"
+                login_url = f"{request.api_url}/auth/login"
                 logging.info(f"🔐 Attempting login to: {login_url}")
+                logging.info(f"📧 Email: {request.email}")
+                logging.info(f"🔑 Password length: {len(request.password)} chars")
+                
+                login_payload = {"email": request.email, "password": request.password}
+                logging.info(f"📦 Payload: {login_payload}")
                 
                 response = await client.post(
                     login_url,
-                    json={"email": request.email, "password": request.password},
+                    json=login_payload,
                     timeout=10.0
                 )
                 
@@ -88,18 +93,23 @@ async def login(request: LoginRequest):
                 
                 if response.status_code == 200:
                     data = response.json()
-                    token = data.get('access_token', 'temp-token')
+                    token = data.get('access_token')
+                    if not token:
+                        raise HTTPException(status_code=500, detail="No access token in response")
                     logging.info(f"✅ Real authentication successful")
                     logging.info(f"🔑 Token: {token[:20]}...")
                 else:
-                    # Fallback to mock for development
-                    token = "mock-token"
-                    logging.warning(f"⚠️ API login failed (status {response.status_code}): {response.text}")
+                    # Login failed - return error to user
+                    error_detail = response.text
+                    logging.error(f"❌ API login failed (status {response.status_code}): {error_detail}")
+                    raise HTTPException(status_code=response.status_code, detail=f"Login failed: {error_detail}")
                     
+            except HTTPException:
+                raise  # Re-raise HTTP exceptions
             except Exception as api_error:
-                # Fallback to mock for development
-                token = "mock-token"
+                # Connection error
                 logging.error(f"❌ API connection failed: {type(api_error).__name__}: {api_error}")
+                raise HTTPException(status_code=503, detail=f"Cannot connect to API: {str(api_error)}")
         
         # Create client with token
         state['client'] = BsmartClient(request.api_url, token)
@@ -195,35 +205,77 @@ async def get_projects():
 @app.post("/api/select-project")
 async def select_project(request: ProjectSelection):
     """Select project."""
+    logging.info(f"📌 POST /api/select-project called")
+    logging.info(f"   Project ID: {request.project_id}")
+    logging.info(f"   Authenticated: {state.get('authenticated')}")
+    
     if not state['authenticated']:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    # TODO: Get real project from API
-    projects = {
-        "1": {"id": "1", "name": "Sistema de Vendas", "description": "Sistema principal"},
-        "2": {"id": "2", "name": "Portal Cliente", "description": "Portal web"},
-        "3": {"id": "3", "name": "API Gateway", "description": "Gateway de APIs"}
-    }
-    
-    if request.project_id not in projects:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    state['selected_project'] = projects[request.project_id]
-    
-    await broadcast_update({
-        'type': 'project_selected',
-        'project': state['selected_project']
-    })
-    
-    return {"success": True, "project": state['selected_project']}
+    # Get real projects from API
+    try:
+        if state.get('client'):
+            logging.info("🌐 Fetching projects to find selected one...")
+            projects = await state['client']._get_projects()
+            
+            # Find the selected project
+            selected = None
+            for project in projects:
+                if str(project.get('id')) == str(request.project_id):
+                    selected = project
+                    break
+            
+            if not selected:
+                logging.error(f"❌ Project not found: {request.project_id}")
+                logging.error(f"   Available projects: {[p.get('id') for p in projects]}")
+                raise HTTPException(status_code=404, detail="Project not found")
+            
+            state['selected_project'] = selected
+            logging.info(f"✅ Project selected: {selected.get('name')}")
+            
+            await broadcast_update({
+                'type': 'project_selected',
+                'project': state['selected_project']
+            })
+            
+            return {"success": True, "project": state['selected_project']}
+        else:
+            logging.error("❌ No client available")
+            raise HTTPException(status_code=500, detail="Client not initialized")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"❌ Error selecting project: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/work-items")
 async def get_work_items():
     """Get work items for selected project."""
+    logging.info("🔍 GET /api/work-items called")
+    logging.info(f"   Selected project: {state.get('selected_project')}")
+    logging.info(f"   Has client: {state.get('client') is not None}")
+    
     if not state['selected_project']:
         raise HTTPException(status_code=400, detail="No project selected")
     
-    # TODO: Get real work items from API
+    # Try to get real work items from API
+    try:
+        if state.get('client'):
+            project_id = state['selected_project']['id']
+            logging.info(f"🌐 Attempting to fetch work items for project {project_id}...")
+            
+            work_items = await state['client']._get_project_work_items(project_id)
+            logging.info(f"✅ Loaded {len(work_items)} real work items from API")
+            return {"work_items": work_items}
+        else:
+            logging.warning("⚠️ No client available")
+    except Exception as e:
+        logging.error(f"❌ Failed to get real work items: {type(e).__name__}: {e}")
+        import traceback
+        logging.error(f"   Traceback: {traceback.format_exc()}")
+    
+    # Fallback to mock data
+    logging.info("📁 Using mock work items (fallback)")
     work_items = [
         {
             "id": "WI-1",
