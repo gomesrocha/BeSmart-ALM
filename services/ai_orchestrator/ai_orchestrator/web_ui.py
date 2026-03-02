@@ -52,6 +52,15 @@ class WorkItemAction(BaseModel):
     work_items: List[WorkItemDict]
     task_type: str
 
+class WorkItemRequest(BaseModel):
+    id: str
+    title: str
+    description: str
+
+class AddToQueueRequest(BaseModel):
+    work_items: List[WorkItemRequest]
+    task_type: str = "code"
+
 # API Routes
 @app.get("/")
 async def root():
@@ -326,53 +335,39 @@ async def get_work_items():
     return {"work_items": work_items}
 
 @app.post("/api/add-to-queue")
-async def add_to_queue(request: WorkItemAction):
+async def add_to_queue(request: AddToQueueRequest):
     """Add work items to processing queue."""
     if not state['queue']:
         raise HTTPException(status_code=400, detail="Queue not initialized")
     
-    # Get work items (simplified)
-    work_items = await get_work_items()
-    requested_ids = [wi.id for wi in request.work_items]
-    selected_items = [wi for wi in work_items['work_items'] if wi['id'] in requested_ids]
+    if not state['selected_project']:
+        raise HTTPException(status_code=400, detail="No project selected")
+    
+    logging.info(f"📥 Adding {len(request.work_items)} items to queue with task type: {request.task_type}")
     
     added_count = 0
-    for wi in selected_items:
-        status = wi.get('status', '').lower()
-        if status in ['done', 'completed', 'closed', 'resolved', 'pronto', 'concluído', 'concluido']:
-            continue
-            
-        complexity_map = {
-            "simple": TaskComplexity.SIMPLE,
-            "medium": TaskComplexity.MEDIUM,
-            "complex": TaskComplexity.COMPLEX
-        }
-        
-        priority_map = {
-            "low": 1,
-            "medium": 3,
-            "high": 5,
-            "critical": 10
-        }
-        
+    for wi in request.work_items:
+        # Create task from work item
         task = Task(
-            id=f"task-{wi['id']}",
-            work_item_id=wi["id"],
-            project_id=state['selected_project']["id"],
-            title=wi["title"],
-            description=wi["description"],
-            priority=priority_map.get(wi["priority"], 3),
-            complexity=complexity_map.get(wi["complexity"], TaskComplexity.MEDIUM),
+            id=f"task-{wi.id}",
+            work_item_id=wi.id,
+            project_id=state['selected_project']['id'],
+            title=wi.title,
+            description=wi.description,
             task_type=request.task_type,
-            acceptance_criteria=wi.get("acceptance_criteria", [])
+            complexity=TaskComplexity.MEDIUM,  # Default
+            priority=3,  # Default
+            status=TaskStatus.PENDING,
+            created_at=datetime.now()
         )
         
         await state['queue'].add_task(task)
         added_count += 1
+        logging.info(f"   ✅ Added: {wi.title}")
     
     await broadcast_update({
         'type': 'queue_updated',
-        'stats': state['queue'].get_stats().to_dict()
+        'queue_size': len(state['queue'].pending_queue)
     })
     
     return {"success": True, "added": added_count}
@@ -467,25 +462,115 @@ async def broadcast_update(message: Dict[str, Any]):
                 connections.remove(connection)
 
 async def simulate_processing():
-    """Simulate processing for demo purposes."""
+    """Process tasks from queue using agent pool."""
+    logging.info("🚀 Starting task processing loop")
+    
     while state['processing'] and state['queue']:
-        stats = state['queue'].get_stats()
-        if stats.pending_tasks == 0:
-            state['processing'] = False
+        try:
+            # Get next task from queue
+            task = await state['queue'].get_next_task()
+            
+            if not task:
+                # No tasks available or at capacity
+                await asyncio.sleep(2)
+                
+                # Check if we're done
+                stats = state['queue'].get_stats()
+                if stats.pending_tasks == 0 and stats.in_progress_tasks == 0:
+                    logging.info("✅ All tasks completed")
+                    state['processing'] = False
+                    await broadcast_update({
+                        'type': 'processing_completed',
+                        'processing': False
+                    })
+                    break
+                continue
+            
+            logging.info(f"🔄 Processing task {task.id} for work item {task.work_item_id}")
+            
+            # Broadcast task started
             await broadcast_update({
-                'type': 'processing_completed',
-                'processing': False
+                'type': 'task_started',
+                'task_id': task.id,
+                'work_item_id': task.work_item_id
             })
-            break
-        
-        # Simulate work
-        await asyncio.sleep(5)
-        
-        # Update queue (simulate completion)
-        await broadcast_update({
-            'type': 'queue_updated',
-            'stats': state['queue'].get_stats().to_dict()
-        })
+            
+            # Get an available agent
+            agent = await state['agent_pool'].get_agent(task.complexity)
+            
+            if not agent:
+                logging.warning(f"⚠️ No agent available for task {task.id}")
+                await state['queue'].complete_task(task.id, False, "No agent available")
+                continue
+            
+            # Execute task
+            try:
+                logging.info(f"🤖 Agent {agent.name} executing task {task.id}")
+                
+                # Prepare work item context
+                work_item_context = {
+                    'id': task.work_item_id,
+                    'title': task.metadata.get('title', 'Unknown'),
+                    'description': task.metadata.get('description', ''),
+                    'project_id': state['selected_project']
+                }
+                
+                # Execute with agent
+                result = await agent.execute_task(
+                    task_id=task.id,
+                    work_item=work_item_context,
+                    repo_path=state['repo_path']
+                )
+                
+                # Mark task as completed
+                await state['queue'].complete_task(task.id, True)
+                
+                logging.info(f"✅ Task {task.id} completed successfully")
+                
+                # Broadcast task completed
+                await broadcast_update({
+                    'type': 'task_completed',
+                    'task_id': task.id,
+                    'work_item_id': task.work_item_id,
+                    'success': True
+                })
+                
+            except Exception as e:
+                error_msg = str(e)
+                logging.error(f"❌ Task {task.id} failed: {error_msg}")
+                
+                # Mark task as failed
+                await state['queue'].complete_task(task.id, False, error_msg)
+                
+                # Broadcast task failed
+                await broadcast_update({
+                    'type': 'task_failed',
+                    'task_id': task.id,
+                    'work_item_id': task.work_item_id,
+                    'error': error_msg
+                })
+            
+            finally:
+                # Release agent back to pool
+                await state['agent_pool'].release_agent(agent)
+            
+            # Broadcast queue stats update
+            stats = state['queue'].get_stats()
+            await broadcast_update({
+                'type': 'queue_updated',
+                'stats': {
+                    'pending': stats.pending_tasks,
+                    'in_progress': stats.in_progress_tasks,
+                    'completed': stats.completed_tasks,
+                    'failed': stats.failed_tasks
+                }
+            })
+            
+        except Exception as e:
+            logging.error(f"❌ Error in processing loop: {e}")
+            await asyncio.sleep(5)
+    
+    logging.info("🛑 Processing loop stopped")
 
 if __name__ == "__main__":
     import uvicorn
