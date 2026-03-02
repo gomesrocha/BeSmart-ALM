@@ -482,7 +482,9 @@
                 return;
             }
             
-            if (!selectedTaskType) {
+            const currentTaskType = document.getElementById('taskTypeSelect').value;
+
+            if (!currentTaskType) {
                 alert('Please select a task type first');
                 return;
             }
@@ -493,7 +495,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         work_items: selectedItems,
-                        task_type: selectedTaskType
+                        task_type: currentTaskType
                     })
                 });
                 
@@ -501,7 +503,7 @@
                     checkboxes.forEach(cb => cb.checked = false);
                     updateSelectedCount();
                     loadQueueStatus();
-                    alert(`Added ${selectedItems.length} work item(s) to queue with task type: ${selectedTaskType}`);
+                    alert(`Added ${selectedItems.length} work item(s) to queue with task type: ${currentTaskType}`);
                 } else {
                     const error = await response.text();
                     alert(`Failed to add items: ${error}`);

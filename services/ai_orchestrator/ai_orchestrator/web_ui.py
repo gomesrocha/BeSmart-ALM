@@ -43,8 +43,14 @@ class LoginRequest(BaseModel):
 class ProjectSelection(BaseModel):
     project_id: str
 
+class WorkItemDict(BaseModel):
+    id: str
+    title: str
+    description: str
+
 class WorkItemAction(BaseModel):
-    work_item_ids: List[str]
+    work_items: List[WorkItemDict]
+    task_type: str
 
 # API Routes
 @app.get("/")
@@ -327,7 +333,8 @@ async def add_to_queue(request: WorkItemAction):
     
     # Get work items (simplified)
     work_items = await get_work_items()
-    selected_items = [wi for wi in work_items['work_items'] if wi['id'] in request.work_item_ids]
+    requested_ids = [wi.id for wi in request.work_items]
+    selected_items = [wi for wi in work_items['work_items'] if wi['id'] in requested_ids]
     
     added_count = 0
     for wi in selected_items:
