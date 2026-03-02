@@ -331,7 +331,8 @@ async def add_to_queue(request: WorkItemAction):
     
     added_count = 0
     for wi in selected_items:
-        if wi['status'] != 'ready':
+        status = wi.get('status', '').lower()
+        if status in ['done', 'completed', 'closed', 'resolved', 'pronto', 'concluído', 'concluido']:
             continue
             
         complexity_map = {

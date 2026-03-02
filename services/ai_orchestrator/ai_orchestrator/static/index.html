@@ -441,7 +441,7 @@
                     div.dataset.id = wi.id;
                     div.innerHTML = `
                         <div class="work-item-header">
-                            <input type="checkbox" class="work-item-checkbox" data-id="${wi.id}" ${wi.status === 'ready' ? '' : 'disabled'}>
+                            <input type="checkbox" class="work-item-checkbox" data-id="${wi.id}" ${['done', 'completed', 'closed', 'resolved', 'pronto', 'concluído', 'concluido'].includes((wi.status || '').toLowerCase()) ? 'disabled' : ''}>
                             <h4>${wi.title}</h4>
                             <span class="status ${wi.status}">${wi.status}</span>
                         </div>
