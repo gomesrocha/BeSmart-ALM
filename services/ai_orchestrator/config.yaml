@@ -1,0 +1,86 @@
+# AI Orchestrator Configuration
+
+# Bsmart-ALM API Configuration
+bsmart_alm:
+  api_url: "http://localhost:8086/api/v1"
+  api_key: "${BSMART_API_KEY}"
+  poll_interval: 30  # seconds
+
+# Git Configuration
+git:
+  provider: "github"  # github or gitlab
+  api_token: "${GIT_API_TOKEN}"
+  default_branch: "main"
+  pr_auto_merge: false
+  
+# Repository Configuration
+repository:
+  base_path: "${HOME}/bsmart-repos"  # Base path for repositories
+  # You can override with absolute path: "/path/to/your/repos"
+
+# Agent Configuration
+agents:
+  aider_ollama:
+    enabled: true
+    model: "deepseek-coder-v2:latest"
+    base_url: "http://localhost:11434"
+    max_concurrent: 2
+  
+  aider_gemini:
+    enabled: false
+    model: "gemini-pro"
+    api_key: "${GOOGLE_API_KEY}"
+    max_concurrent: 1
+  
+  aider_grok:
+    enabled: false
+    model: "grok-beta"
+    api_key: "${XAI_API_KEY}"
+    max_concurrent: 1
+  
+  openhands:
+    enabled: false
+    image: "ghcr.io/all-hands-ai/openhands:latest"
+    model: "gpt-4"
+    api_key: "${OPENAI_API_KEY}"
+    max_concurrent: 1
+
+# Validation Configuration
+validation:
+  continue:
+    enabled: true
+    api_key: "${OPENAI_API_KEY}"
+    model: "gpt-4"
+  
+  security:
+    enabled: true
+    api_key: "${OPENAI_API_KEY}"
+    model: "gpt-4"
+  
+  tests:
+    enabled: true
+    timeout: 300  # seconds
+    frameworks:
+      - pytest
+      - jest
+      - junit
+
+# Queue Configuration
+queue:
+  max_concurrent_tasks: 3
+  max_retries: 3
+  retry_delay: 60  # seconds
+
+# Monitoring Configuration
+monitoring:
+  log_level: "INFO"
+  log_format: "json"
+  metrics_port: 9090
+  health_check_port: 8080
+  health_check_interval: 60  # seconds
+
+# Cost Control
+cost_control:
+  enabled: true
+  max_daily_cost: 10.0  # USD
+  alert_threshold: 0.8  # 80% of max

@@ -1,0 +1,12 @@
+# URLs ngrok - Geradas em Tue Feb 24 16:37:59 -03 2026
+
+Frontend: https://skylar-glacial-brainily.ngrok-free.dev
+Backend:  https://gomesrocha.ngrok.app
+
+Credenciais:
+Email: admin@example.com
+Senha: admin123
+
+Dashboards:
+Backend:  http://localhost:4040
+Frontend: http://localhost:4041

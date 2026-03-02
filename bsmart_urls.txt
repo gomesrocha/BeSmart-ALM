@@ -1,0 +1,17 @@
+🌐 Bsmart-ALM - URLs de Acesso
+================================
+
+Frontend (Interface):
+https://bsmart.ngrok.app
+
+Backend (API):
+https://projectmanager.ngrok.app
+
+Credenciais de Teste:
+Email: admin@example.com
+Senha: admin123
+
+================================
+Iniciado em: Mon Mar  2 11:07:34 -03 2026
+
+Compartilhe a URL do Frontend com seus colegas!

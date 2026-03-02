@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeeSmart: AI Orchestrator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: #2563eb; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+        .status-indicator { width: 12px; height: 12px; border-radius: 50%; }
+        .status-indicator.connected { background: #10b981; }
+        .status-indicator.disconnected { background: #ef4444; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; margin-right: 10px; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .work-item { border: 1px solid #e5e7eb; border-radius: 6px; padding: 15px; margin-bottom: 10px; }
+        .work-item.ready { border-left: 4px solid #10b981; }
+        .work-item.backlog { border-left: 4px solid #6b7280; }
+        .priority-critical { color: #ef4444; font-weight: bold; }
+        .priority-high { color: #f59e0b; font-weight: bold; }
+        .priority-medium { color: #3b82f6; }
+        .priority-low { color: #6b7280; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .stat-card { text-align: center; padding: 15px; background: #f8fafc; border-radius: 6px; }
+        .stat-number { font-size: 24px; font-weight: bold; color: #1f2937; }
+        .stat-label { font-size: 14px; color: #6b7280; }
+        .hidden { display: none; }
+        .processing { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>🐝 BeeSmart: AI Orchestrator</h1>
+                    <p>Autonomous coding agent orchestration system</p>
+                </div>
+                <button class="btn btn-danger hidden" id="logoutBtn" onclick="logout()">🚪 Logout</button>
+            </div>
+        </div>
+        
+        <div class="status">
+            <div class="status-indicator" id="statusIndicator"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
+        
+        <!-- Login Section -->
+        <div class="card" id="loginSection">
+            <h2>🔑 Login to Bsmart-ALM</h2>
+            <div class="form-group">
+                <label>API URL:</label>
+                <input type="text" id="apiUrl" value="http://localhost:8086/api/v1">
+            </div>
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="email" value="acme@acme.com">
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="password" value="acme1234">
+            </div>
+            <div class="form-group">
+                <label>📂 Local Repository Path:</label>
+                <input type="text" id="repoPath" value="~/bsmart-repos" placeholder="~/bsmart-repos">
+                <small style="color: #6b7280;">Path where agent will create/modify code</small>
+            </div>
+            <button class="btn btn-primary" onclick="login()">Login</button>
+        </div>
+        
+        <!-- Main Interface -->
+        <div id="mainInterface" class="hidden">
+            <!-- Project Selection -->
+            <div class="card">
+                <h2>📁 Project Selection</h2>
+                <div class="form-group">
+                    <label>Select Project:</label>
+                    <select id="projectSelect" onchange="selectProject()">
+                        <option value="">-- Select Project --</option>
+                    </select>
+                </div>
+                <div id="selectedProject" class="hidden">
+                    <h3 id="projectName"></h3>
+                    <p id="projectDescription"></p>
+                </div>
+            </div>
+            
+            <!-- Task Type Selection -->
+            <div class="card hidden" id="taskTypeSection">
+                <h2>🎯 What do you want to do?</h2>
+                <div class="form-group">
+                    <label>Select Task Type:</label>
+                    <select id="taskTypeSelect">
+                        <option value="">-- Select Task Type --</option>
+                        <option value="requirements">📋 Requirements Analysis</option>
+                        <option value="architecture">🏗️ Architecture Design</option>
+                        <option value="specification">📝 Technical Specification</option>
+                        <option value="code">💻 Code Implementation</option>
+                        <option value="tests">🧪 Test Creation</option>
+                        <option value="documentation">📚 Documentation</option>
+                        <option value="refactoring">♻️ Code Refactoring</option>
+                        <option value="bugfix">🐛 Bug Fix</option>
+                    </select>
+                </div>
+                <div id="taskTypeDescription" style="margin-top: 10px; padding: 10px; background: #f8fafc; border-radius: 6px; display: none;">
+                    <p id="taskTypeDescText"></p>
+                </div>
+            </div>
+            
+            <!-- Work Items -->
+            <div class="card hidden" id="workItemsSection">
+                <h2>🔍 Work Items</h2>
+                <button class="btn btn-primary" onclick="loadWorkItems()">Load Work Items</button>
+                <div id="workItemsList"></div>
+                <button class="btn btn-success hidden" onclick="addSelectedToQueue()" id="addToQueueBtn">Add Selected to Queue</button>
+            </div>
+            
+            <!-- Queue Status -->
+            <div class="grid">
+                <div class="card">
+                    <h2>📊 Queue Status</h2>
+                    <div class="stats" id="queueStats">
+                        <div class="stat-card">
+                            <div class="stat-number" id="pendingTasks">0</div>
+                            <div class="stat-label">Pending</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="inProgressTasks">0</div>
+                            <div class="stat-label">In Progress</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="completedTasks">0</div>
+                            <div class="stat-label">Completed</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="failedTasks">0</div>
+                            <div class="stat-label">Failed</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>🤖 Agents Status</h2>
+                    <div id="agentsStatus"></div>
+                    <button class="btn btn-primary" onclick="checkAgentHealth()">Check Health</button>
+                </div>
+            </div>
+            
+            <!-- Processing Controls -->
+            <div class="card">
+                <h2>▶️ Processing Controls</h2>
+                <button class="btn btn-success" onclick="startProcessing()" id="startBtn">Start Processing</button>
+                <button class="btn btn-danger hidden" onclick="stopProcessing()" id="stopBtn">Stop Processing</button>
+                <div id="processingStatus" class="hidden">
+                    <p class="processing">🔄 Processing work items...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        let authenticated = false;
+        let selectedProject = null;
+        let processing = false;
+        let selectedTaskType = null;
+        
+        // Task type descriptions
+        const taskTypeDescriptions = {
+            'requirements': 'Analyze and document project requirements, user stories, and acceptance criteria',
+            'architecture': 'Design system architecture, components, and technical decisions',
+            'specification': 'Create detailed technical specifications for implementation',
+            'code': 'Implement features, components, and functionality',
+            'tests': 'Create unit tests, integration tests, and test suites',
+            'documentation': 'Write technical documentation, API docs, and guides',
+            'refactoring': 'Improve code quality, structure, and maintainability',
+            'bugfix': 'Fix bugs, issues, and defects in the codebase'
+        };
+        
+        // Update task type description
+        document.getElementById('taskTypeSelect').addEventListener('change', function() {
+            selectedTaskType = this.value;
+            const descDiv = document.getElementById('taskTypeDescription');
+            const descText = document.getElementById('taskTypeDescText');
+            
+            if (selectedTaskType) {
+                descText.textContent = taskTypeDescriptions[selectedTaskType];
+                descDiv.style.display = 'block';
+            } else {
+                descDiv.style.display = 'none';
+            }
+        });
+        
+        // Initialize WebSocket
+        function initWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            
+            ws.onopen = function() {
+                document.getElementById('statusIndicator').className = 'status-indicator connected';
+                document.getElementById('statusText').textContent = 'Connected';
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+            
+            ws.onclose = function() {
+                document.getElementById('statusIndicator').className = 'status-indicator disconnected';
+                document.getElementById('statusText').textContent = 'Disconnected';
+                setTimeout(initWebSocket, 3000);
+            };
+        }
+        
+        function handleWebSocketMessage(data) {
+            switch(data.type) {
+                case 'initial_state':
+                    authenticated = data.authenticated;
+                    selectedProject = data.selected_project;
+                    processing = data.processing;
+                    updateUI();
+                    break;
+                case 'login_success':
+                    authenticated = true;
+                    updateUI();
+                    loadProjects();
+                    break;
+                case 'project_selected':
+                    selectedProject = data.project;
+                    updateUI();
+                    break;
+                case 'queue_updated':
+                    updateQueueStats(data.stats);
+                    break;
+                case 'processing_started':
+                    processing = true;
+                    updateProcessingUI();
+                    break;
+                case 'processing_stopped':
+                case 'processing_completed':
+                    processing = false;
+                    updateProcessingUI();
+                    break;
+            }
+        }
+        
+        function updateUI() {
+            if (authenticated) {
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('mainInterface').classList.remove('hidden');
+                document.getElementById('logoutBtn').classList.remove('hidden');
+                
+                if (selectedProject) {
+                    document.getElementById('selectedProject').classList.remove('hidden');
+                    document.getElementById('projectName').textContent = selectedProject.name;
+                    document.getElementById('projectDescription').textContent = selectedProject.description;
+                    document.getElementById('taskTypeSection').classList.remove('hidden');
+                    document.getElementById('workItemsSection').classList.remove('hidden');
+                }
+            } else {
+                document.getElementById('loginSection').classList.remove('hidden');
+                document.getElementById('mainInterface').classList.add('hidden');
+                document.getElementById('logoutBtn').classList.add('hidden');
+            }
+        }
+        
+        function updateProcessingUI() {
+            if (processing) {
+                document.getElementById('startBtn').classList.add('hidden');
+                document.getElementById('stopBtn').classList.remove('hidden');
+                document.getElementById('processingStatus').classList.remove('hidden');
+            } else {
+                document.getElementById('startBtn').classList.remove('hidden');
+                document.getElementById('stopBtn').classList.add('hidden');
+                document.getElementById('processingStatus').classList.add('hidden');
+            }
+        }
+        
+        async function logout() {
+            try {
+                await fetch('/api/logout', {method: 'POST'});
+                authenticated = false;
+                selectedProject = null;
+                selectedTaskType = null;
+                
+                // Reset UI
+                document.getElementById('projectSelect').innerHTML = '<option value="">-- Select Project --</option>';
+                document.getElementById('taskTypeSelect').value = '';
+                document.getElementById('taskTypeDescription').style.display = 'none';
+                document.getElementById('workItemsList').innerHTML = '';
+                
+                updateUI();
+                alert('Logged out successfully');
+            } catch (error) {
+                console.error('❌ Logout error:', error);
+                alert('Logout failed: ' + error.message);
+            }
+        }
+        
+        async function login() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const repoPath = document.getElementById('repoPath').value;
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({api_url: apiUrl, email, password, repo_path: repoPath})
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Login failed');
+                }
+                
+                // Login successful - load projects immediately
+                console.log('✅ Login successful, loading projects...');
+                authenticated = true;
+                updateUI();
+                await loadProjects();
+                
+            } catch (error) {
+                console.error('❌ Login error:', error);
+                alert('Login failed: ' + error.message);
+            }
+        }
+        
+        async function loadProjects() {
+            console.log('📁 Loading projects...');
+            try {
+                const response = await fetch('/api/projects');
+                console.log('Projects response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Projects data:', data);
+                
+                const select = document.getElementById('projectSelect');
+                select.innerHTML = '<option value="">-- Select Project --</option>';
+                
+                if (data.projects && data.projects.length > 0) {
+                    console.log(`✅ Found ${data.projects.length} projects`);
+                    data.projects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        option.textContent = project.name;
+                        select.appendChild(option);
+                        console.log(`  - Added project: ${project.name}`);
+                    });
+                } else {
+                    console.warn('⚠️ No projects found');
+                }
+            } catch (error) {
+                console.error('❌ Failed to load projects:', error);
+            }
+        }
+        
+        async function selectProject() {
+            const projectId = document.getElementById('projectSelect').value;
+            if (!projectId) return;
+            
+            try {
+                await fetch('/api/select-project', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({project_id: projectId})
+                });
+            } catch (error) {
+                alert('Failed to select project: ' + error.message);
+            }
+        }
+        
+        async function loadWorkItems() {
+            try {
+                const response = await fetch('/api/work-items');
+                const data = await response.json();
+                
+                const container = document.getElementById('workItemsList');
+                container.innerHTML = '';
+                
+                data.work_items.forEach(wi => {
+                    const div = document.createElement('div');
+                    div.className = `work-item ${wi.status}`;
+                    div.innerHTML = `
+                        <input type="checkbox" id="wi-${wi.id}" value="${wi.id}" ${wi.status === 'ready' ? '' : 'disabled'}>
+                        <label for="wi-${wi.id}">
+                            <strong>${wi.title}</strong>
+                            <span class="priority-${wi.priority}">[${wi.priority.toUpperCase()}]</span>
+                            <br>
+                            <small>${wi.description}</small>
+                            <br>
+                            <small>Status: ${wi.status} | Complexity: ${wi.complexity}</small>
+                        </label>
+                    `;
+                    container.appendChild(div);
+                });
+                
+                document.getElementById('addToQueueBtn').classList.remove('hidden');
+            } catch (error) {
+                alert('Failed to load work items: ' + error.message);
+            }
+        }
+        
+        async function addSelectedToQueue() {
+            const checkboxes = document.querySelectorAll('#workItemsList input[type="checkbox"]:checked');
+            const workItemIds = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (workItemIds.length === 0) {
+                alert('Please select work items to add to queue');
+                return;
+            }
+            
+            if (!selectedTaskType) {
+                alert('Please select a task type first');
+                return;
+            }
+            
+            try {
+                await fetch('/api/add-to-queue', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        work_item_ids: workItemIds,
+                        task_type: selectedTaskType
+                    })
+                });
+                
+                checkboxes.forEach(cb => cb.checked = false);
+                loadQueueStatus();
+                alert(`Added ${workItemIds.length} work item(s) to queue with task type: ${selectedTaskType}`);
+            } catch (error) {
+                alert('Failed to add to queue: ' + error.message);
+            }
+        }
+        
+        async function loadQueueStatus() {
+            try {
+                const response = await fetch('/api/queue-status');
+                const data = await response.json();
+                
+                if (data.stats) {
+                    updateQueueStats(data.stats);
+                }
+            } catch (error) {
+                console.error('Failed to load queue status:', error);
+            }
+        }
+        
+        function updateQueueStats(stats) {
+            document.getElementById('pendingTasks').textContent = stats.pending_tasks;
+            document.getElementById('inProgressTasks').textContent = stats.in_progress_tasks;
+            document.getElementById('completedTasks').textContent = stats.completed_tasks;
+            document.getElementById('failedTasks').textContent = stats.failed_tasks;
+        }
+        
+        async function checkAgentHealth() {
+            try {
+                const response = await fetch('/api/agents-status');
+                const data = await response.json();
+                
+                const container = document.getElementById('agentsStatus');
+                container.innerHTML = '';
+                
+                if (data.stats) {
+                    const stats = data.stats;
+                    const health = data.health;
+                    
+                    Object.entries(stats.agents).forEach(([name, info]) => {
+                        const isHealthy = health[name];
+                        const div = document.createElement('div');
+                        div.innerHTML = `
+                            <p><strong>${name}</strong>: 
+                            ${info.available ? '✅ Available' : '⏳ Busy'} | 
+                            ${isHealthy ? '💚 Healthy' : '❤️ Unhealthy'}
+                            </p>
+                        `;
+                        container.appendChild(div);
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to check agent health:', error);
+            }
+        }
+        
+        async function startProcessing() {
+            try {
+                await fetch('/api/start-processing', {method: 'POST'});
+            } catch (error) {
+                alert('Failed to start processing: ' + error.message);
+            }
+        }
+        
+        async function stopProcessing() {
+            try {
+                await fetch('/api/stop-processing', {method: 'POST'});
+            } catch (error) {
+                alert('Failed to stop processing: ' + error.message);
+            }
+        }
+        
+        // Initialize
+        initWebSocket();
+        
+        // Periodic updates
+        setInterval(() => {
+            if (authenticated) {
+                loadQueueStatus();
+                checkAgentHealth();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

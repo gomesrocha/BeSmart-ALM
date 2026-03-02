@@ -1,0 +1,1 @@
+"""Architecture generation service."""

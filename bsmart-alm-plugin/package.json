@@ -1,0 +1,176 @@
+{
+  "name": "bsmart-alm-plugin",
+  "displayName": "Bsmart-ALM Integration",
+  "description": "Integrate your IDE with Bsmart-ALM for seamless work item management",
+  "version": "1.0.2",
+  "publisher": "bsmart",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "bsmart-alm",
+          "title": "Bsmart-ALM",
+          "icon": "$(rocket)"
+        }
+      ]
+    },
+    "views": {
+      "bsmart-alm": [
+        {
+          "id": "bsmartDashboard",
+          "name": "Dashboard",
+          "type": "webview"
+        },
+        {
+          "id": "bsmartWorkItems",
+          "name": "Work Items",
+          "when": "bsmart.authenticated"
+        }
+      ],
+      "explorer": [
+        {
+          "id": "bsmartWorkItemsExplorer",
+          "name": "Bsmart Work Items",
+          "when": "bsmart.authenticated"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "bsmart.login",
+        "title": "Login to Bsmart-ALM",
+        "category": "Bsmart"
+      },
+      {
+        "command": "bsmart.logout",
+        "title": "Logout from Bsmart-ALM",
+        "category": "Bsmart"
+      },
+      {
+        "command": "bsmart.selectProject",
+        "title": "Select Project",
+        "category": "Bsmart"
+      },
+      {
+        "command": "bsmart.refreshWorkItems",
+        "title": "Refresh Work Items",
+        "category": "Bsmart",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "bsmart.openWorkItem",
+        "title": "Open Work Item",
+        "category": "Bsmart"
+      },
+      {
+        "command": "bsmart.exportToAI",
+        "title": "Export to AI Tool",
+        "category": "Bsmart",
+        "icon": "$(robot)"
+      },
+      {
+        "command": "bsmart.updateStatus",
+        "title": "Update Status",
+        "category": "Bsmart"
+      },
+      {
+        "command": "bsmart.addComment",
+        "title": "Add Comment",
+        "category": "Bsmart"
+      },
+      {
+        "command": "bsmart.viewSpecification",
+        "title": "View Specification",
+        "category": "Bsmart",
+        "icon": "$(book)"
+      },
+      {
+        "command": "bsmart.viewArchitecture",
+        "title": "View Architecture",
+        "category": "Bsmart",
+        "icon": "$(symbol-structure)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "bsmart.refreshWorkItems",
+          "when": "view == bsmartWorkItems",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "bsmart.exportToAI",
+          "when": "view == bsmartWorkItems && viewItem == workitem",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Bsmart-ALM",
+      "properties": {
+        "bsmart.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8086",
+          "description": "Bsmart-ALM server URL"
+        },
+        "bsmart.defaultAITool": {
+          "type": "string",
+          "enum": [
+            "copilot",
+            "continue",
+            "kiro",
+            "cursor",
+            "clipboard"
+          ],
+          "default": "copilot",
+          "description": "Default AI tool for context export"
+        },
+        "bsmart.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh work items"
+        },
+        "bsmart.refreshInterval": {
+          "type": "number",
+          "default": 300,
+          "description": "Refresh interval in seconds"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "18.19.0",
+    "@types/node-fetch": "^2.6.13",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/test-electron": "^2.3.9",
+    "@vscode/vsce": "^2.24.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
+}
